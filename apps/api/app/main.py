@@ -4,7 +4,7 @@ import argparse
 from http.server import ThreadingHTTPServer
 
 from .api.handler import ApiHandler
-from .core.config import DB_PATH, DEFAULT_BALANCE_RATE_SCAN_INTERVAL
+from .core.config import DB_PATH, settings
 from .core.scheduler import start_unified_monitor
 from .domain.store import RadarStore
 from .infrastructure.integrations.qqbot_gateway import start_qqbot_gateway
@@ -12,29 +12,29 @@ from .infrastructure.integrations.qqbot_gateway import start_qqbot_gateway
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Channel Radar API backend")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=4176)
+    parser.add_argument("--host", default=settings.host)
+    parser.add_argument("--port", type=int, default=settings.port)
     parser.add_argument("--seed-demo", action="store_true", help="空库启动时写入演示渠道数据")
     parser.add_argument(
         "--balance-rate-scan-interval",
         "--scan-interval",
         dest="balance_rate_scan_interval",
         type=int,
-        default=DEFAULT_BALANCE_RATE_SCAN_INTERVAL,
+        default=settings.balance_rate_scan_interval,
         help="余额、倍率、模型状态统一监控间隔秒数，默认 60 秒",
     )
     parser.add_argument("--no-balance-rate-scan", action="store_true", help="关闭后台余额和倍率扫描")
-    parser.add_argument("--auto-probe-interval", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--auto-probe-interval", type=int, default=settings.auto_probe_interval, help=argparse.SUPPRESS)
     parser.add_argument("--no-auto-probe", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--rate-probe-interval", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--rate-probe-interval", type=int, default=settings.rate_probe_interval, help=argparse.SUPPRESS)
     parser.add_argument("--no-rate-probe", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--model-monitor-interval", type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--model-monitor-interval", type=int, default=settings.model_monitor_interval, help=argparse.SUPPRESS)
     parser.add_argument("--no-model-monitor", action="store_true", help="关闭后台模型监控")
     args = parser.parse_args()
 
     ApiHandler.store = RadarStore(DB_PATH, seed_demo=args.seed_demo)
     legacy_intervals = [value for value in (args.auto_probe_interval, args.rate_probe_interval, args.model_monitor_interval) if value is not None]
-    scan_interval = min(legacy_intervals) if legacy_intervals else args.balance_rate_scan_interval
+    scan_interval = min([args.balance_rate_scan_interval, *legacy_intervals])
     include_balance = not args.no_balance_rate_scan and not args.no_auto_probe
     include_rate = not args.no_balance_rate_scan and not args.no_rate_probe
     include_model = not args.no_model_monitor

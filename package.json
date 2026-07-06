@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "api:dev": "python3 -m apps.api.app.main --host 127.0.0.1 --port 4176",
+    "api:dev": "node scripts/api-dev.mjs",
     "web:dev": "npm --workspace apps/web run dev",
     "web:build": "npm --workspace apps/web run build",
     "web:preview": "npm --workspace apps/web run preview"

@@ -1,14 +1,70 @@
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const API_HOST = "127.0.0.1";
-const API_PORT = 4176;
-const API_HEALTH_URL = `http://${API_HOST}:${API_PORT}/api/health`;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ENV_PATH = path.join(ROOT, ".env");
 const HEALTH_TIMEOUT_MS = 30_000;
 const HEALTH_INTERVAL_MS = 500;
 
 const children = new Set();
 let isShuttingDown = false;
+
+loadRootEnv();
+
+const API_HOST = readEnvString("API_HOST", "127.0.0.1");
+const API_PORT = readEnvInteger("API_PORT", 4176);
+const API_HEALTH_URL = "http://" + API_HOST + ":" + API_PORT + "/api/health";
+
+function unquoteEnvValue(value) {
+  if (value.length >= 2 && value[0] === value[value.length - 1] && ["'", '"'].includes(value[0])) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function loadRootEnv() {
+  if (!fs.existsSync(ENV_PATH)) {
+    return;
+  }
+
+  for (const line of fs.readFileSync(ENV_PATH, "utf8").split(/\r?\n/u)) {
+    let trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    if (trimmed.startsWith("export ")) {
+      trimmed = trimmed.slice("export ".length).trim();
+    }
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (key && process.env[key] === undefined) {
+      process.env[key] = unquoteEnvValue(value);
+    }
+  }
+}
+
+function readEnvString(name, fallback) {
+  return process.env[name] || fallback;
+}
+
+function readEnvInteger(name, fallback) {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return fallback;
+  }
+  const value = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(value)) {
+    throw new Error(name + " must be an integer, got " + JSON.stringify(rawValue));
+  }
+  return value;
+}
 
 function findPythonCommand() {
   const candidates =
@@ -77,7 +133,7 @@ async function waitForApiHealth() {
     await wait(HEALTH_INTERVAL_MS);
   }
 
-  throw new Error(`API did not become healthy within ${HEALTH_TIMEOUT_MS / 1_000}s: ${API_HEALTH_URL}`);
+  throw new Error("API did not become healthy within " + HEALTH_TIMEOUT_MS / 1_000 + "s: " + API_HEALTH_URL);
 }
 
 async function main() {
@@ -96,12 +152,12 @@ async function main() {
     if (isShuttingDown) {
       return;
     }
-    console.error(`API process exited. code=${code ?? "null"} signal=${signal ?? "null"}`);
+    console.error("API process exited. code=" + (code ?? "null") + " signal=" + (signal ?? "null"));
     stopChildren();
     process.exit(code ?? 1);
   });
 
-  console.log(`Waiting for API health check: ${API_HEALTH_URL}`);
+  console.log("Waiting for API health check: " + API_HEALTH_URL);
   await waitForApiHealth();
   console.log("API is healthy. Starting web app...");
 
@@ -116,7 +172,7 @@ async function main() {
     if (isShuttingDown) {
       return;
     }
-    console.error(`Web process exited. code=${code ?? "null"} signal=${signal ?? "null"}`);
+    console.error("Web process exited. code=" + (code ?? "null") + " signal=" + (signal ?? "null"));
     stopChildren();
     process.exit(code ?? 0);
   });
