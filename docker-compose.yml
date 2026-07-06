@@ -1,4 +1,23 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: channel-watch-api:latest
+    container_name: channel-watch-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    expose:
+      - "4176"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4176/api/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
   web:
     build:
       context: .
@@ -7,8 +26,9 @@ services:
     container_name: channel-watch-web
     restart: unless-stopped
     environment:
-      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://host.docker.internal:4176}
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:4176}
     ports:
       - "${WEB_HTTP_PORT:-8080}:80"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      api:
+        condition: service_healthy
