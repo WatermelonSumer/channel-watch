@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: channel-watch-web:latest
+    container_name: channel-watch-web
+    restart: unless-stopped
+    environment:
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://host.docker.internal:4176}
+    ports:
+      - "${WEB_HTTP_PORT:-8080}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
