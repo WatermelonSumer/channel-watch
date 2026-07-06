@@ -1,0 +1,12 @@
+.git
+.idea
+node_modules
+apps/web/dist
+dist
+*.tsbuildinfo
+__pycache__
+.pycache
+data
+backups
+.env
+.env.*
